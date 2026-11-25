@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Piezo Footstep Generator 60×30 — Seri & Paralel</title>
+<style>
+:root{--bg:#0c0a08;--acc:#e8a45c;--tx:#f2ece2;--mut:#a99b87;--dim:#77695a}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{background:radial-gradient(circle at 30% 15%,#1b1712 0%,#0c0a08 70%);overflow:hidden;font-family:-apple-system,"Segoe UI",Inter,sans-serif;color:var(--tx)}
+#holder{position:fixed;inset:0;cursor:grab;touch-action:none}
+.glass{background:rgba(24,20,16,.68);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.08);border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.45)}
+button{font-family:inherit;cursor:pointer}button:active{transform:scale(.97)}
+.eyebrow{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--acc);font-weight:600;margin-bottom:4px}
+h1{font-size:16px;font-weight:600;color:#fff}
+.sub{font-size:12px;color:var(--mut);margin:2px 0 12px}
+
+/* panel */
+#panel{position:fixed;padding:18px 20px;z-index:5;overflow:auto}
+body[data-ui=win] #panel{top:20px;left:20px;width:320px;max-height:calc(100vh - 40px)}
+body[data-ui=hp] #panel{left:0;right:0;bottom:0;border-radius:20px 20px 0 0;max-height:48vh;padding:8px 16px calc(14px + env(safe-area-inset-bottom,0px))}
+.grab{display:none;width:44px;height:5px;border-radius:3px;background:rgba(255,255,255,.25);margin:0 auto 10px}
+body[data-ui=hp] .grab{display:block}
+body[data-ui=hp] .sub{display:none}
+body[data-ui=hp] h1{font-size:14px}
+body[data-ui=hp] #panel.min .more{display:none}
+.seg{display:flex;gap:4px;padding:3px;border-radius:11px;background:rgba(255,255,255,.06);margin:10px 0}
+.seg button{flex:1;padding:9px 6px;border:0;border-radius:9px;background:transparent;color:var(--mut);font-weight:600;font-size:12px}
+.seg button.on{background:var(--acc);color:#1a1200}
+.quick{display:block}
+.btns{display:grid;grid-template-columns:1fr;gap:8px;margin-top:10px}
+body[data-ui=hp] .btns{grid-template-columns:1fr 1fr}
+#stepBtn{padding:12px;border:0;border-radius:10px;background:linear-gradient(135deg,#e8a45c,#c9762f);color:#1a1200;font-weight:700;font-size:13px}
+#lampBtn{padding:12px;border-radius:10px;background:rgba(253,230,138,.1);color:#fde68a;font-weight:700;font-size:13px;border:1px solid rgba(253,230,138,.3)}
+#lampBtn.on{background:linear-gradient(135deg,#fde68a,#f59e0b);color:#1a1400}
+body[data-ui=hp] #stepBtn,body[data-ui=hp] #lampBtn{padding:16px 8px;font-size:14px}
+.vrow{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:#c2b5a0}
+#voltReading{font-size:22px;font-weight:700;color:#4ade80}
+#voltBar{height:8px;border-radius:5px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:4px}
+#voltFill{height:100%;width:0;background:linear-gradient(90deg,#16a34a,#4ade80);transition:width .15s}
+#voltNote{font-size:10px;color:var(--dim);margin-top:6px}
+body[data-ui=hp] #voltNote{display:none}
+.ctl{margin-top:12px;font-size:11px;color:#c2b5a0}
+.ctl input{width:100%;accent-color:var(--acc);margin-top:6px}
+.legend-row{display:flex;gap:10px;align-items:center;margin:8px 0;font-size:12px}
+.swatch{width:12px;height:12px;border-radius:3px;flex-shrink:0}
+.ln{display:block;color:#eee5d8;font-weight:500}.ld{display:block;font-size:10px;color:#8a7d6a}
+#hint{font-size:10px;color:var(--dim);margin-top:10px;line-height:1.6}
+.sec{margin-top:14px;border-top:1px solid rgba(255,255,255,.08);padding-top:12px}
+
+/* HUD */
+#count{position:fixed;z-index:4;padding:10px 16px;text-align:right}
+#count .num{font-size:24px;font-weight:700;color:var(--acc);line-height:1}
+#count .lbl{display:block;font-size:9px;color:var(--mut);letter-spacing:1px;margin-top:4px;max-width:170px}
+body[data-ui=win] #count{top:20px;right:76px}
+body[data-ui=hp] #count{top:calc(12px + env(safe-area-inset-top,0px));left:12px;text-align:left;padding:8px 12px;border-radius:12px}
+body[data-ui=hp] #count .num{font-size:18px}
+#dims{position:fixed;bottom:20px;right:20px;z-index:4;color:var(--dim);font-size:11px;padding:9px 14px}
+body[data-ui=hp] #dims{display:none}
+#menuBtn{position:fixed;z-index:6;top:20px;right:20px;width:46px;height:46px;border-radius:14px;font-size:20px;color:#fff;border:1px solid rgba(255,255,255,.1)}
+body[data-ui=hp] #menuBtn{top:calc(12px + env(safe-area-inset-top,0px));right:12px;width:44px;height:44px}
+
+/* menu */
+#menu{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(8,6,4,.78);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);overflow:auto}
+#menu.hide{display:none}
+#menu .card{width:100%;max-width:520px;padding:26px 24px;margin:auto}
+#menu h2{font-size:22px;font-weight:700;margin:4px 0 4px;color:#fff}
+#menu p.d{font-size:13px;color:var(--mut);margin-bottom:18px;line-height:1.5}
+#menu h3{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin:16px 0 8px;font-weight:600}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.opt{text-align:left;padding:14px;border-radius:14px;border:1.5px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:var(--tx)}
+.opt .ic{font-size:22px;display:block;margin-bottom:6px}
+.opt b{display:block;font-size:14px}.opt small{display:block;font-size:11px;color:var(--mut);margin-top:3px;line-height:1.4}
+.opt.on{border-color:var(--acc);background:rgba(232,164,92,.14)}
+#go{margin-top:22px;width:100%;padding:15px;border:0;border-radius:12px;background:linear-gradient(135deg,#e8a45c,#c9762f);color:#1a1200;font-weight:700;font-size:15px}
+.stp{display:none}.stp.on{display:block}
+#nm{width:100%;padding:14px;border-radius:12px;border:1.5px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:#fff;font-size:16px;outline:none;font-family:inherit}
+#nm:focus{border-color:var(--acc)}
+.nav{display:flex;gap:10px;margin-top:22px}
+.nav button{padding:14px;border-radius:12px;font-weight:700;font-size:15px;border:0}
+#back{background:rgba(255,255,255,.08);color:var(--tx);flex:1}
+.nav #go{margin-top:0;flex:2;width:auto}
+#go:disabled{opacity:.4}
+.dots{display:flex;gap:6px;justify-content:center;margin-top:16px}.dots i{width:8px;height:8px;border-radius:4px;background:rgba(255,255,255,.2)}.dots i.on{width:22px;background:var(--acc)}
+#hello{font-size:12px;color:var(--mut);margin-bottom:6px}#hello b{color:#fff}
+.grow{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:#c2b5a0;margin-top:6px}.grow b{color:#7dd3fc;font-size:13px}
+#step10{padding:12px;border-radius:10px;border:1px solid rgba(232,164,92,.5);background:rgba(232,164,92,.12);color:var(--acc);font-weight:700;font-size:13px}
+body[data-ui=hp] #step10{padding:16px 8px;font-size:14px}
+.btns,body[data-ui=hp] .btns{grid-template-columns:2fr 1fr}
+#lampBtn{grid-column:1/-1}
+#calc .cr{display:flex;justify-content:space-between;font-size:11px;color:#c2b5a0;margin:4px 0}#calc .cr b{color:#fff}
+#calc small{display:block;font-size:10px;color:var(--dim);line-height:1.6;margin-top:6px}
+#scn,#dia,#lmp{width:100%;margin-top:6px;padding:10px;border-radius:10px;background:rgba(255,255,255,.07);color:#fff;border:1px solid rgba(255,255,255,.14);font-size:13px;font-family:inherit}
+#scn option,#dia option,#lmp option{background:#1b1712}
+
+/* pop up perbandingan */
+#cmpBtn{grid-column:1/-1;padding:12px;border-radius:10px;background:rgba(125,211,252,.1);color:#7dd3fc;font-weight:700;font-size:13px;border:1px solid rgba(125,211,252,.35)}
+body[data-ui=hp] #cmpBtn{padding:16px 8px;font-size:14px}
+#cmp{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(8,6,4,.8);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#cmp.hide{display:none}
+#cmp .card{width:100%;max-width:780px;max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);overflow:auto;padding:18px;margin:auto}
+.chead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:4px}
+.chead h2{font-size:19px;font-weight:700;color:#fff}
+#cmpX{width:38px;height:38px;border-radius:11px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;font-size:16px;flex-shrink:0}
+#cmpDesc{font-size:12px;color:var(--mut);line-height:1.55;margin:2px 0 10px}
+#cmpTabs button{font-size:11.5px;padding:9px 2px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.chip{padding:8px 12px;border-radius:20px;border:1.5px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:var(--mut);font-size:12px;font-weight:600}
+.chip.on{border-color:var(--acc);background:rgba(232,164,92,.15);color:var(--tx)}
+.tw{overflow-x:auto;border-radius:12px;border:1px solid rgba(255,255,255,.08)}
+.tw table{border-collapse:collapse;width:100%;font-size:12px}
+.tw th,.tw td{padding:9px 10px;text-align:center;border-bottom:1px solid rgba(255,255,255,.06);white-space:nowrap}
+.tw th:first-child,.tw td:first-child{text-align:left;position:sticky;left:0;background:#1d1914;color:#c2b5a0;z-index:1;white-space:normal;min-width:108px;max-width:124px;font-weight:500}
+.tw thead th{vertical-align:bottom;color:#fff;font-size:12px}
+.tw td{min-width:96px;color:#eee5d8;font-variant-numeric:tabular-nums}
+.tw td.best{color:#4ade80;font-weight:700}
+.tw td.bad{color:#f87171}
+.tw tr.same td{opacity:.55}
+.cbar{display:block;height:4px;border-radius:3px;background:rgba(255,255,255,.08);margin-top:5px;overflow:hidden}
+.cbar i{display:block;height:100%;background:linear-gradient(90deg,#c9762f,#e8a45c)}
+.use{margin-top:6px;padding:5px 9px;border-radius:8px;border:1px solid rgba(232,164,92,.5);background:rgba(232,164,92,.12);color:var(--acc);font-size:11px;font-weight:700}
+.act{display:inline-block;margin-top:6px;padding:5px 9px;border-radius:8px;background:rgba(74,222,128,.15);color:#4ade80;font-size:11px;font-weight:700}
+#cmpSum{margin-top:12px;font-size:12px;line-height:1.65;color:#d8ccb8}
+#cmpSum ul{margin-left:16px}
+#cmpSum b{color:#fff}
+#cmpBase{margin-top:8px;font-size:10.5px;color:var(--dim);line-height:1.5}
+
+/* animasi pop up & ajakan */
+@keyframes popIn{from{opacity:0;transform:translateY(26px) scale(.94)}to{opacity:1;transform:none}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes rowIn{from{opacity:0}to{opacity:1}}
+@keyframes liIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes wig{0%,60%,100%{transform:rotate(0)}10%{transform:rotate(-16deg)}25%{transform:rotate(14deg)}40%{transform:rotate(-10deg)}50%{transform:rotate(6deg)}}
+@keyframes ring{0%{box-shadow:0 0 0 0 rgba(125,211,252,.55)}70%{box-shadow:0 0 0 12px rgba(125,211,252,0)}100%{box-shadow:0 0 0 0 rgba(125,211,252,0)}}
+@keyframes shrink{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+#cmp:not(.hide){animation:fadeIn .25s both}
+#cmp:not(.hide) .card{animation:popIn .45s cubic-bezier(.34,1.56,.64,1) both}
+.tw tbody tr{animation:rowIn .45s calc(var(--i,0)*45ms + 120ms) both}
+.cbar i{transform-origin:left;animation:grow .7s .3s cubic-bezier(.2,.8,.2,1) both}
+#cmpSum li{animation:liIn .45s .55s both}
+#cmpBtn.pulse{animation:ring 1.4s ease-out infinite}
+#nudge{position:fixed;z-index:8;left:50%;bottom:24px;width:min(390px,calc(100vw - 24px));display:flex;align-items:center;gap:10px;padding:11px 10px 13px 14px;overflow:hidden;opacity:0;pointer-events:none;transform:translate(-50%,46px) scale(.9);transition:transform .55s cubic-bezier(.34,1.56,.64,1),opacity .3s;border-color:rgba(125,211,252,.35)}
+body[data-ui=hp] #nudge{bottom:auto;top:calc(68px + env(safe-area-inset-top,0px));transform:translate(-50%,-34px) scale(.9)}
+#nudge.show{opacity:1;pointer-events:auto;transform:translate(-50%,0) scale(1)}
+#nudge::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:linear-gradient(90deg,#7dd3fc,#e8a45c);transform-origin:left;transform:scaleX(0)}
+#nudge.show::after{animation:shrink 9s linear both}
+#nudge .ni{font-size:26px;line-height:1;display:inline-block;transform-origin:70% 80%}
+#nudge.show .ni{animation:wig 2.4s .4s infinite}
+#nudge .nt{flex:1;min-width:0}
+#nudge .nt b{display:block;font-size:14px;color:#fff}
+#nudge .nt small{display:block;font-size:11px;color:var(--mut);margin-top:2px;line-height:1.4}
+#nYes{padding:9px 12px;border:0;border-radius:10px;background:linear-gradient(135deg,#e8a45c,#c9762f);color:#1a1200;font-weight:700;font-size:12px;white-space:nowrap}
+#nNo{width:30px;height:30px;border-radius:9px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:var(--mut);font-size:13px;flex-shrink:0}
+@media (prefers-reduced-motion:reduce){#cmp,#cmp *,#nudge,#nudge *,#cmpBtn{animation-duration:.01ms!important;animation-iteration-count:1!important;animation-delay:0s!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body data-ui="win">
+<div id="holder"></div>
+
+<button id="menuBtn" class="glass" aria-label="Menu">☰</button>
+<div id="count" class="glass"><div class="num" id="cNum"></div><span class="lbl" id="cLbl"></span></div>
+<div id="dims" class="glass">60 cm × 30 cm · 1 unit = 10 cm · <b>Spasi</b> = 1 orang menginjak</div>
+
+<div id="panel" class="glass">
+  <div class="grab" id="grab"></div>
+  <div id="hello"></div>
+  <div class="eyebrow" id="eyebrow"></div>
+  <h1 id="ttl"></h1>
+  <div class="sub" id="sub"></div>
+  <div class="quick">
+    <div class="vrow"><span>Bacaan voltmeter</span><span id="voltReading">0.00 V</span></div>
+    <div id="voltBar"><div id="voltFill"></div></div>
+    <div id="voltNote"></div>
+    <div class="grow"><span>🏭 Generator (tanpa kabel)</span><b id="genRead">0.00 V</b></div>
+    <div class="grow"><span>Σ Total terbangkit</span><b id="totRead">0.00 V</b></div>
+    <div class="grow"><span>👣 Orang yang sudah menginjak</span><b id="pplRead">0</b></div>
+    <div class="btns"><button id="stepBtn">🚶 Injak Tatakan</button><button id="step10">×10 orang</button><button id="lampBtn">💡 Nyalakan Lampu</button><button id="cmpBtn">📊 Bandingkan Perlakuan</button></div>
+  </div>
+  <div class="more">
+    <div class="sec">
+      <div class="vrow"><span>Rangkaian</span></div>
+      <div class="seg" id="segC"><button data-c="seri">Seri</button><button data-c="paralel">Paralel</button></div>
+      <div class="vrow"><span>Tampilan</span></div>
+      <div class="seg" id="segU"><button data-u="win">🖥 Windows</button><button data-u="hp">📱 Handphone</button></div>
+    </div>
+    <div class="ctl"><label>Bongkar lapisan modul</label><input type="range" id="explode" min="0" max="1.6" step="0.01" value="0.5"></div>
+    <div class="ctl"><label>Lampu (daya kecil)</label><select id="lmp"><option value="ultra">LED hemat · 0,85 mW (0,5 mA)</option><option value="red" selected>LED merah · 3,6 mW (2 mA)</option><option value="white">LED putih · 15 mW (5 mA)</option></select></div>
+    <div class="ctl"><label>Diameter keping piezo</label><select id="dia"><option value="20" selected>20 mm (sesuai Tabel 3.2)</option><option value="27">27 mm (buzzer standar)</option><option value="35">35 mm</option><option value="44">44 mm</option></select></div>
+    <div class="ctl"><label>Gaya injak (data jurnal REM 2025)</label><select id="scn"><option value="all">Semua jenis berat badan</option><option value="w69">Berjalan · 69 kg</option><option value="w98">Berjalan · 98 kg</option><option value="j69">Melompat · 69 kg</option><option value="j98">Melompat · 98 kg</option></select></div>
+    <div class="sec" id="calc"></div>
+    <div class="sec" id="legend"></div>
+    <div id="hint"></div>
+  </div>
+</div>
+
+<div id="menu">
+  <div class="card glass">
+    <div class="eyebrow">Piezo Footstep Generator</div>
+    <h2>Tatakan Piezo 60×30 cm</h2>
+    <p class="d">Simulasi 3D 2 modul (8 keping piezo) dengan generator besar. Masukkan namamu, lalu pilih rangkaian dan tampilan.</p>
+    <div class="stp on" data-s="0"><h3>Siapa namamu?</h3><input id="nm" maxlength="24" placeholder="Tulis nama kamu…" autocomplete="off"><p class="d" style="margin:10px 0 0;font-size:12px">Nama wajib diisi sebelum melihat simulasi.</p></div><div class="stp" data-s="1"><h3>Jenis rangkaian</h3>
+    <div class="opts" id="mC">
+      <button class="opt" data-c="seri"><span class="ic">🔗</span><b>Seri</b><small>Tegangan dijumlah, hingga ±4.5V. Arus kecil, cepat terkuras.</small></button>
+      <button class="opt" data-c="paralel"><span class="ic">🔀</span><b>Paralel</b><small>Tegangan ±2.0V, muatan & arus besar, lampu lebih awet.</small></button>
+    </div>
+    </div><div class="stp" data-s="2"><h3>Mode tampilan</h3>
+    <div class="opts" id="mU">
+      <button class="opt" data-u="win"><span class="ic">🖥</span><b>Windows</b><small>Layar lebar, panel melayang di kiri, kontrol mouse & keyboard.</small></button>
+      <button class="opt" data-u="hp"><span class="ic">📱</span><b>Handphone</b><small>Panel bawah, tombol besar, sentuh & cubit untuk zoom.</small></button>
+    </div>
+    </div><div class="nav"><button id="back">‹ Kembali</button><button id="go">Lanjut →</button></div><div class="dots"><i></i><i></i><i></i></div>
+  </div>
+</div>
+
+<div id="nudge" class="glass" role="status" aria-live="polite"><span class="ni">🤔</span><div class="nt"><b id="nB"></b><small id="nS"></small></div><button id="nYes">Lihat perbedaannya</button><button id="nNo" aria-label="Tutup">✕</button></div>
+
+<div id="cmp" class="hide" role="dialog" aria-modal="true" aria-label="Perbandingan perlakuan">
+  <div class="card glass">
+    <div class="chead"><div><div class="eyebrow">Perbandingan</div><h2>Perbedaan Antar Perlakuan</h2></div><button id="cmpX" aria-label="Tutup">✕</button></div>
+    <div class="seg" id="cmpTabs">
+      <button data-f="scn">🦶 Gaya injak</button><button data-f="dia">⭕ Diameter</button><button data-f="lmp">💡 Lampu</button><button data-f="circuit">🔗 Rangkaian</button>
+    </div>
+    <p id="cmpDesc"></p>
+    <div class="chips" id="cmpChips"></div>
+    <div class="tw" id="cmpTbl"></div>
+    <div id="cmpSum"></div>
+    <div id="cmpBase"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const CFG={
+ seri:{eb:'Rangkaian SERI',t:'Piezo Tersambung Berantai',sub:'2 modul 30×30cm (60×30cm) · 8 piezo · 1 jalur seri · 1 rectifier',vmax:4.5,ser:1,lbl:'V PUNCAK RATA-RATA · SERI (ΣV)',
+  note:'Skala 0–5V · ambang LED 1.8V · batas realistis seri: ±4.5V (akumulatif)',
+  leg:[['#c9a24a','Piezo disc (4/modul)','(+) satu piezo → (−) piezo berikutnya'],['#d43f3f','Jalur seri tunggal','modul 01→02 berantai'],['#1c1c1c','Rectifier tunggal','searahkan AC → DC di ujung rantai'],['#4ade80','Kapasitor kecil','simpan tegangan, naik s/d V puncak'],['#e2e2e2','Voltmeter analog','tegangan tiap piezo dijumlah'],['#fde68a','Lampu LED','LED daya kecil, nyala bila V ≥ Vf']],
+  hint:'RANGKAIAN SERI: tiap modul dihubungkan berurutan (kutub + ke kutub − modul berikutnya) membentuk satu jalur ke rectifier. Tegangan tiap piezo saling menjumlah sehingga jauh lebih tinggi daripada satu piezo, namun arus dibatasi piezo terlemah. Kapasitansi ekivalen mengecil (C/N), sehingga muatan per injakan kecil: kapasitor terisi lambat, tetapi tegangan tinggi membuat lampu terang dan awet.'},
+ paralel:{eb:'Rangkaian PARALEL',t:'Piezo Tersambung Sebus',sub:'2 modul 30×30cm (60×30cm) · 8 piezo · semua (+) & (−) satu bus · 1 rectifier',vmax:2,ser:0,lbl:'V PUNCAK RATA-RATA · PARALEL (= 1 KEPING)',
+  note:'Skala 0–5V · ambang LED 1.8V · batas realistis paralel: ±2.0V (setara 1 piezo)',
+  leg:[['#c9a24a','Piezo disc (4/modul)','semua (+) & (−) digabung'],['#8a1f1f','Bus/titik sambung bersama','2 modul bertemu di satu simpul'],['#1c1c1c','Rectifier tunggal','searahkan AC → DC dari bus'],['#4ade80','Kapasitor kecil','tegangan = 1 keping, muatan besar'],['#e2e2e2','Voltmeter analog','setara 1 piezo saja'],['#fde68a','Lampu LED','LED daya kecil, nyala bila V ≥ Vf']],
+  hint:'RANGKAIAN PARALEL: seluruh kutub (+) digabung jadi satu bus, begitu pula kutub (−), lalu menuju rectifier. Tegangan tidak bertambah (sama dengan satu keping, bergantung gaya injak), tetapi kapasitansi ekivalen N×C membuat muatan per injakan besar sehingga arus lebih besar dan kapasitor cepat terisi. Karena tegangannya rendah, lampu baru menyala bila injakan cukup kuat.'}
+};
+let circuit='seri', ui=matchMedia('(max-width:700px)').matches?'hp':'win';
+try{circuit=localStorage.getItem('pz_c')||circuit;ui=localStorage.getItem('pz_u')||ui}catch(e){}
+let capV=0,lampOn=false,userName='';try{userName=localStorage.getItem('pz_n')||''}catch(e){}
+
+/* ---------- THREE scene ---------- */
+const holder=$('holder'),scene=new THREE.Scene();
+scene.fog=new THREE.Fog(0x0c0a08,28,60);
+const camera=new THREE.PerspectiveCamera(38,innerWidth/innerHeight,.1,100);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputEncoding=THREE.sRGBEncoding;renderer.setClearColor(0x0c0a08);holder.appendChild(renderer.domElement);
+scene.add(new THREE.AmbientLight(0xfff3e0,.35));
+const key=new THREE.DirectionalLight(0xfff0d8,1.15);key.position.set(10,17,9);key.castShadow=true;key.shadow.mapSize.set(2048,2048);
+Object.assign(key.shadow.camera,{left:-18,right:18,top:18,bottom:-18});scene.add(key);
+const fl=new THREE.DirectionalLight(0x88aacc,.35);fl.position.set(-10,8,-6);scene.add(fl);
+const rl=new THREE.DirectionalLight(0xffd9a0,.4);rl.position.set(-4,5,-12);scene.add(rl);
+
+function tex(w,h,fn,rep){const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');fn(x);const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;if(rep)t.repeat.set(rep,rep);return t}
+const cardTex=col=>tex(256,256,x=>{x.fillStyle=col;x.fillRect(0,0,256,256);for(let i=0;i<256;i+=6){x.strokeStyle=`rgba(0,0,0,${.05+Math.random()*.05})`;x.beginPath();x.moveTo(0,i);x.lineTo(256,i+3);x.stroke()}});
+const fabTex=tex(256,256,x=>{x.fillStyle='#2e2b26';x.fillRect(0,0,256,256);for(let i=0;i<5000;i++){x.fillStyle=`rgba(0,0,0,${Math.random()*.06})`;x.fillRect(Math.random()*256,Math.random()*256,1,1)}});
+const woodTex=tex(512,512,x=>{x.fillStyle='#2a2018';x.fillRect(0,0,512,512);for(let i=0;i<40;i++){x.strokeStyle=`rgba(60,42,26,${.3+Math.random()*.3})`;x.lineWidth=2+Math.random()*6;x.beginPath();const y=Math.random()*512;x.moveTo(0,y);x.bezierCurveTo(170,y+30,340,y-30,512,y);x.stroke()}},4);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(60,60),new THREE.MeshStandardMaterial({map:woodTex,roughness:.85}));
+floor.rotation.x=-Math.PI/2;floor.position.y=-1.2;floor.receiveShadow=true;scene.add(floor);
+const root=new THREE.Group();scene.add(root);
+
+const M=(o)=>new THREE.MeshStandardMaterial(o);
+const baseMat=M({map:cardTex('#b98b52'),roughness:.92}),holeBoardMat=M({map:cardTex('#a67a44'),roughness:.9}),holeMat=M({color:0x0a0806,roughness:1});
+const brass=M({color:0xd4af37,metalness:.85,roughness:.28}),ceramic=M({color:0x171512,roughness:.55}),topMat=M({map:fabTex,roughness:.95});
+const ledOff=M({color:0x1c3a24,roughness:.4}),ledOn=M({color:0x22c55e,emissive:0x22c55e,emissiveIntensity:1.4,roughness:.3});
+const wireRed=M({color:0xb3352b,roughness:.55}),bundleMat=M({color:0x8a1f1f,roughness:.5});
+function tube(pts,mat,r=.035){const m=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),24,r,6,false),mat);m.castShadow=true;return m}
+function label(text,color,size,w=1,h=1){const t=tex(160,160,x=>{x.font=`700 ${size}px -apple-system,sans-serif`;x.fillStyle=color;x.textAlign='center';x.textBaseline='middle';x.fillText(text,80,84)});t.wrapS=t.wrapT=THREE.ClampToEdgeWrapping;const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true}));s.scale.set(w,h,1);return s}
+
+const TILE=3,COLS=2,totalW=6,totalD=3,inset=.85;
+const lp=[[-inset,-inset],[inset,-inset],[-inset,inset],[inset,inset]];
+const tiles=[],statusLeds=[],discs=[];
+for(let c=0;c<COLS;c++){
+  const g=new THREE.Group(),cx=-totalW/2+TILE/2+c*TILE;g.position.set(cx,0,0);
+  const lB=new THREE.Group(),lH=new THREE.Group(),lP=new THREE.Group(),lT=new THREE.Group();
+  const bm=new THREE.Mesh(new THREE.BoxGeometry(TILE,.3,TILE),baseMat);bm.castShadow=bm.receiveShadow=true;lB.add(bm);
+  const hb=new THREE.Mesh(new THREE.BoxGeometry(TILE,.28,TILE),holeBoardMat);hb.castShadow=hb.receiveShadow=true;lH.add(hb);
+  lp.forEach(([px,pz])=>{
+    const h=new THREE.Mesh(new THREE.CylinderGeometry(.34,.34,.32,20),holeMat);h.position.set(px,0,pz);lH.add(h);
+    const d=new THREE.Mesh(new THREE.CylinderGeometry(.42,.42,.06,28),brass);d.position.set(px,.02,pz);d.castShadow=true;lP.add(d);discs.push(d);
+    const e=new THREE.Mesh(new THREE.CylinderGeometry(.26,.26,.04,28),ceramic);e.position.set(px,.06,pz);lP.add(e);discs.push(e)});
+  const loop=[lp[0],lp[1],lp[3],lp[2]].map(([x,z])=>new THREE.Vector3(x,.1,z));loop.push(loop[0].clone());lP.add(tube(loop,wireRed,.03));
+  const sl=new THREE.Mesh(new THREE.SphereGeometry(.1,12,12),ledOff);sl.position.set(TILE/2-.3,.15,TILE/2-.3);lP.add(sl);statusLeds.push(sl);
+  lP.add(tube([new THREE.Vector3(0,.1,TILE/2-.2),new THREE.Vector3(0,.1,TILE/2+.35)],wireRed,.03));
+  const tm=new THREE.Mesh(new THREE.BoxGeometry(TILE,.15,TILE),topMat);tm.castShadow=true;lT.add(tm);
+  g.add(lB,lH,lP,lT);const lb=label(String(c+1).padStart(2,'0'),'#e8a45c',64,.9,.9);lb.position.set(0,2.6,0);g.add(lb);
+  root.add(g);tiles.push({lB,lH,lP,lT,exitX:cx,exitZ:TILE/2+.35});
+}
+let EF=.5;function explode(f){EF=f;const g=.85;tiles.forEach(t=>{t.lB.position.y=0;t.lH.position.y=g*f;t.lP.position.y=g*2*f;t.lT.position.y=g*3*f})}
+explode(.5);$('explode').oninput=e=>explode(+e.target.value);
+
+const boardZ=totalD/2+2.3,toBoard=new THREE.Vector3(0,.35,boardZ-1.1);
+/* wiring (dibangun ulang saat ganti rangkaian) */
+const wiring=new THREE.Group();root.add(wiring);
+function buildWiring(mode){
+  wiring.traverse(o=>{if(o.geometry)o.geometry.dispose()});wiring.clear();
+  if(mode==='paralel'){
+    const j=new THREE.Vector3(0,.3,totalD/2+1);
+    tiles.forEach(t=>wiring.add(tube([new THREE.Vector3(t.exitX,.1,t.exitZ),new THREE.Vector3(t.exitX*.3,.2,totalD/2+.6),j],wireRed,.025)));
+    const n=new THREE.Mesh(new THREE.SphereGeometry(.14,16,16),M({color:0x8a1f1f,roughness:.4}));n.position.copy(j);wiring.add(n);
+    const l=label('BUS','#c2b5a0',24,.9,.28);l.position.set(j.x,j.y+.5,j.z);wiring.add(l);
+    wiring.add(tube([j,toBoard],bundleMat,.09));
+  }else{
+    const a=tiles[0],b=tiles[1];
+    wiring.add(tube([new THREE.Vector3(a.exitX,.15,a.exitZ),new THREE.Vector3((a.exitX+b.exitX)/2,.55,a.exitZ+.15),new THREE.Vector3(b.exitX,.15,b.exitZ)],wireRed,.03));
+    wiring.add(tube([new THREE.Vector3(b.exitX,.15,b.exitZ),new THREE.Vector3(b.exitX*.3,.3,totalD/2+.9),toBoard],bundleMat,.09));
+  }
+}
+
+/* papan kontrol */
+const boardTex=tex(512,256,x=>{x.fillStyle='#e7ddc4';x.fillRect(0,0,512,256);x.fillStyle='#8a7d5e';for(let a=16;a<512;a+=20)for(let b=16;b<256;b+=20){x.beginPath();x.arc(a,b,2.6,0,7);x.fill()}});boardTex.repeat.set(1,1);
+const board=new THREE.Mesh(new THREE.BoxGeometry(7.2,.15,3.2),M({map:boardTex,roughness:.8}));board.position.set(.3,.08,boardZ);board.castShadow=board.receiveShadow=true;root.add(board);
+function put(o,x,y,z){o.position.set(x,y,z);root.add(o);return o}
+put(label('PAPAN KONTROL','#c2b5a0',30,2.6,.7),.3,.3,boardZ-1.85);
+const rect=new THREE.Group();const rb=new THREE.Mesh(new THREE.BoxGeometry(.9,.45,.6),M({color:0x141414,roughness:.45}));rb.position.y=.38;rb.castShadow=true;rect.add(rb);
+[[-.35,-.35],[.35,-.35],[-.35,.35],[.35,.35]].forEach(([x,z])=>{const l=new THREE.Mesh(new THREE.CylinderGeometry(.03,.03,.35,8),M({color:0xc0c0c0,metalness:.8,roughness:.3}));l.position.set(x,.18,z);rect.add(l)});
+put(rect,-2.6,.15,boardZ-.6);put(label('RECTIFIER','#8a7d6a',26,1.4,.4),-2.6,1,boardZ-.6);
+root.add(tube([toBoard,new THREE.Vector3(-2.6,.5,boardZ-.6)],bundleMat,.045));
+const cap=new THREE.Group();const cc=new THREE.Mesh(new THREE.CylinderGeometry(.38,.38,1.1,28),M({color:0x37507a,metalness:.35,roughness:.4}));cc.position.y=.65;cc.castShadow=true;cap.add(cc);
+const ct=new THREE.Mesh(new THREE.CylinderGeometry(.4,.4,.08,28),M({color:0xb0b0b0,metalness:.7,roughness:.25}));ct.position.y=1.2;cap.add(ct);
+put(cap,-1.2,.15,boardZ-.5);put(label('KAPASITOR','#8fd9b6',24,1.4,.4),-1.2,1.6,boardZ-.5);
+root.add(tube([new THREE.Vector3(-2.6,.5,boardZ-.6),new THREE.Vector3(-1.2,.5,boardZ-.5)],bundleMat,.04));
+
+/* voltmeter */
+var gMax=5,ledTxt='LED min 1.8V';const gDrawFn=x=>{x.setTransform(1,0,0,1,0,0);x.fillStyle='#f4f0e6';x.fillRect(0,0,512,512);x.translate(256,256);x.strokeStyle=x.fillStyle='#1a1a1a';
+  const s=Math.PI*.83,e=-Math.PI*.83;
+  for(let i=0;i<=10;i++){const a=s+(e-s)*i/10,r2=i%2?178:165;x.lineWidth=i%2?3:5;x.beginPath();x.moveTo(Math.cos(a)*195,-Math.sin(a)*195);x.lineTo(Math.cos(a)*r2,-Math.sin(a)*r2);x.stroke();
+    if(!(i%2)){x.font='700 30px sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText(Math.round(gMax*i/10),Math.cos(a)*140,-Math.sin(a)*140)}}
+  x.font='700 26px sans-serif';x.fillText('VOLT',0,70);x.font='18px sans-serif';x.fillStyle='#7a1f1f';x.fillText(ledTxt,0,100)};const gTex=tex(512,512,gDrawFn);function setGauge(m){gMax=m;gDrawFn(gTex.image.getContext('2d'));gTex.needsUpdate=true}
+gTex.wrapS=gTex.wrapT=THREE.ClampToEdgeWrapping;
+const gauge=new THREE.Group();
+const gf=new THREE.Mesh(new THREE.CircleGeometry(.9,48),M({map:gTex,roughness:.6}));gf.position.set(0,1,.02);gauge.add(gf);
+const gr=new THREE.Mesh(new THREE.TorusGeometry(.9,.06,12,40),M({color:0x2b2f38,metalness:.6,roughness:.3}));gr.position.y=1;gauge.add(gr);
+const gb=new THREE.Mesh(new THREE.BoxGeometry(1.9,1.9,.3),M({color:0x1c1c1c,roughness:.6}));gb.position.set(0,1,-.2);gb.castShadow=true;gauge.add(gb);
+const needle=new THREE.Group();const nb=new THREE.Mesh(new THREE.BoxGeometry(.75,.035,.02),M({color:0xd43f3f,roughness:.4}));nb.position.x=.32;needle.add(nb);
+const nh=new THREE.Mesh(new THREE.CylinderGeometry(.06,.06,.08,16),M({color:0x2b2f38,metalness:.6,roughness:.3}));nh.rotation.x=Math.PI/2;needle.add(nh);needle.position.set(0,1,.05);gauge.add(needle);
+put(gauge,1,0,boardZ-.55);put(label('VOLTMETER','#e2e2e2',26,1.5,.4),1,2.1,boardZ-.55);
+root.add(tube([new THREE.Vector3(-1.2,.9,boardZ-.5),new THREE.Vector3(1,.5,boardZ-.55)],wireRed,.035));
+/* saklar */
+const sw=new THREE.Group();const sb=new THREE.Mesh(new THREE.CylinderGeometry(.28,.3,.25,20),M({color:0x1c1c1c,roughness:.5}));sb.position.y=.12;sw.add(sb);
+const sc=new THREE.Mesh(new THREE.CylinderGeometry(.22,.22,.14,20),M({color:0xd43f3f,roughness:.35}));sc.position.y=.28;sw.add(sc);
+put(sw,2.3,.15,boardZ-.5);put(label('SAKLAR','#c2b5a0',24,1.2,.35),2.3,.8,boardZ-.5);
+root.add(tube([new THREE.Vector3(1,.5,boardZ-.55),new THREE.Vector3(2.3,.35,boardZ-.5)],wireRed,.035));
+/* lampu */
+const lamp=new THREE.Group();
+const l1=new THREE.Mesh(new THREE.CylinderGeometry(.3,.34,.12,20),M({color:0x1c1c1c,roughness:.5}));l1.position.y=.06;lamp.add(l1);
+const ledBodyMat=new THREE.MeshPhysicalMaterial({color:0xff3b30,transparent:true,opacity:.55,roughness:.2});
+const l2=new THREE.Mesh(new THREE.CylinderGeometry(.2,.2,.45,24),ledBodyMat);l2.position.y=.36;l2.castShadow=true;lamp.add(l2);
+[-.09,.09].forEach(x=>{const lg=new THREE.Mesh(new THREE.CylinderGeometry(.02,.02,.3,8),M({color:0xc0c0c0,metalness:.8,roughness:.3}));lg.position.set(x,.15,0);lamp.add(lg)});
+const dome=new THREE.Mesh(new THREE.SphereGeometry(.2,24,24,0,Math.PI*2,0,Math.PI/2),ledBodyMat);dome.position.y=.585;lamp.add(dome);
+const core=new THREE.Mesh(new THREE.SphereGeometry(.11,20,20),M({color:0xff3b30,emissive:0x000000,roughness:.4}));core.position.y=.5;lamp.add(core);
+const bl=new THREE.PointLight(0xff3b30,0,8,2);bl.position.y=.5;lamp.add(bl);
+const glowT=tex(256,256,x=>{const g=x.createRadialGradient(128,128,0,128,128,128);g.addColorStop(0,'rgba(255,255,255,.9)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,256,256)});
+const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:glowT,transparent:true,opacity:0,blending:THREE.AdditiveBlending}));glow.material.color.setHex(0xff3b30);glow.position.y=.5;lamp.add(glow);
+put(lamp,3.4,.15,boardZ-.5);put(label('LAMPU LED','#fde68a',24,1.4,.4),3.4,1.3,boardZ-.5);
+root.add(tube([new THREE.Vector3(2.3,.35,boardZ-.5),new THREE.Vector3(3.4,.35,boardZ-.5)],wireRed,.035));
+
+/* generator besar ala stasiun KA — TIDAK terhubung, tapi ikut berputar & menambah volt tiap injakan */
+const gen=new THREE.Group();gen.position.set(0,-1.2,-6);root.add(gen);
+const steel=M({color:0x2f6f9f,metalness:.55,roughness:.4}),yel=M({color:0xe0a21a,roughness:.5}),drk=M({color:0x1c1c1c,roughness:.6,metalness:.4}),chr=M({color:0xc0c0c0,metalness:.8,roughness:.3});
+function gadd(geo,mat,x,y,z,rz){const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);if(rz)m.rotation.z=rz;m.castShadow=m.receiveShadow=true;gen.add(m);return m}
+gadd(new THREE.BoxGeometry(7.4,.3,2.8),drk,0,.15,0);
+gadd(new THREE.CylinderGeometry(1,1,3,32),steel,-2,1.45,0,Math.PI/2);
+gadd(new THREE.CylinderGeometry(1.08,1.08,.2,32),chr,-.45,1.45,0,Math.PI/2);
+gadd(new THREE.CylinderGeometry(.2,.2,1.3,12),chr,.1,1.45,0,Math.PI/2);
+gadd(new THREE.BoxGeometry(2.6,2,1.9),yel,2,1.3,0);
+gadd(new THREE.CylinderGeometry(.16,.16,1.8,12),drk,2.8,3.2,-.4);
+const fly=new THREE.Group();fly.position.set(.3,1.45,0);gen.add(fly);
+const rim=new THREE.Mesh(new THREE.TorusGeometry(1.2,.14,10,40),chr);rim.rotation.y=Math.PI/2;fly.add(rim);
+for(let k=0;k<3;k++){const s=new THREE.Mesh(new THREE.BoxGeometry(.14,2.3,.14),chr);s.rotation.x=k*Math.PI/3;fly.add(s)}
+const mk=new THREE.Mesh(new THREE.BoxGeometry(.2,.3,.3),M({color:0xd43f3f}));mk.position.y=1.2;fly.add(mk);
+const gC=document.createElement('canvas');gC.width=256;gC.height=96;const gX=gC.getContext('2d'),gT=new THREE.CanvasTexture(gC);
+function drawGen(v){gX.fillStyle='#04150b';gX.fillRect(0,0,256,96);gX.fillStyle='#4ade80';gX.font='700 46px monospace';gX.textAlign='center';gX.textBaseline='middle';gX.fillText(v.toFixed(1)+' V',128,38);gX.font='16px monospace';gX.fillStyle='#86efac';gX.fillText('GEN OUTPUT',128,78);gT.needsUpdate=true}
+drawGen(0);
+const dsp=new THREE.Mesh(new THREE.PlaneGeometry(1.7,.64),new THREE.MeshBasicMaterial({map:gT}));dsp.position.set(2,1.6,.96);gen.add(dsp);
+const genLamp=new THREE.Mesh(new THREE.SphereGeometry(.12,12,12),M({color:0x14532d,emissive:0x22c55e,emissiveIntensity:0}));genLamp.position.set(1.2,.85,.96);gen.add(genLamp);
+function label2(t,c,s,w,h){const k=document.createElement('canvas');k.width=512;k.height=128;const x=k.getContext('2d');x.font=`700 ${s}px -apple-system,sans-serif`;x.fillStyle=c;x.textAlign='center';x.textBaseline='middle';x.fillText(t,256,64);const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(k),transparent:true}));sp.scale.set(w,h,1);return sp}
+const gl1=label2('GENERATOR BESAR (STASIUN)','#7dd3fc',44,4.6,1.15);gl1.position.set(0,4.9,0);gen.add(gl1);
+const gl2=label2('⛔ TIDAK TERHUBUNG KABEL','#f87171',44,4.4,1.1);gl2.position.set(0,4.2,0);gen.add(gl2);
+gen.add(tube([new THREE.Vector3(3.3,.7,1.2),new THREE.Vector3(3.4,.5,2.2),new THREE.Vector3(3.2,.5,3)],wireRed,.04));
+const stubEnd=new THREE.Mesh(new THREE.SphereGeometry(.1,10,10),M({color:0xd43f3f}));stubEnd.position.set(3.2,.5,3);gen.add(stubEnd);
+/* ---------- logic ---------- */
+let LED_V=1.8,lampT='red';const stepBtn=$('stepBtn'),lampBtn=$('lampBtn');
+/* Lampu daya kecil: Vf, arus nominal, warna. R seri = (5V−Vf)/I. Daya = Vf·I */
+const LAMP={ultra:{vf:1.7,i:.0005,c:0xff7a3c,t:'LED hemat'},red:{vf:1.8,i:.002,c:0xff3b30,t:'LED merah'},white:{vf:3,i:.005,c:0xdff3ff,t:'LED putih'}};
+const lampR=()=>(5-LAMP[lampT].vf)/LAMP[lampT].i;
+function setLampType(k){lampT=k;const L=LAMP[k];LED_V=L.vf;ledTxt='LED min '+L.vf+'V';ledBodyMat.color.setHex(L.c);core.material.color.setHex(L.c);bl.color.setHex(L.c);glow.material.color.setHex(L.c);capV=0;setLamp(false);setGauge(gMax);updScale();updCalc()}
+let flash=-1,flashT=0,omega=0,genV=0,lastT=performance.now(),lastG='',fc=0;
+/* Model: Cp=20nF/keping, N=8. Seri: C=Cp/N. Paralel: C=N·Cp. Tiap injakan = 5 siklus charge-sharing ke kapasitor Cs=1µF. */
+const CP=20e-9,CS=1e-6,NC=5,NP=8,VD=.6,TAU_LED=5,TAU_LEAK=120,GMAX=12,TAU_G=10;
+/* V per keping tiap injakan: 10 sampel terukur (REM 2025, Tabel 1-4, 128 PZT 27mm/20nF) */
+const SCN={w69:{d:[1.1,1.1,.9,.7,3.3,3.8,1.4,1,1.1,.7]},w98:{d:[5.2,1.8,8.7,5.7,6.7,4.8,5.8,5.9,5.9,3.9]},j69:{d:[7,7.1,6.2,8.2,8.3,6.7,9.5,4.4,4.9,4.5]},j98:{d:[9.1,8.5,10.6,7.2,10.8,9.6,7.2,10.4,9.5,6.1]}};
+SCN.all={d:[].concat(SCN.w69.d,SCN.w98.d,SCN.j69.d,SCN.j98.d)};
+let scn='w98',lastVp=0,dia=20;const cp=()=>CP*(dia/27)**2,vf=()=>(dia/27)**.85;
+let seqI=0;const avgVp=()=>vf()*SCN[scn].d.reduce((a,b)=>a+b)/SCN[scn].d.length,pickVp=()=>{const d=SCN[scn].d;return vf()*d[(seqI++)%d.length]};
+function updScale(){const ser=CFG[circuit].ser,mx=vf()*Math.max(...SCN[scn].d)*(ser?NP:1),nice=[5,10,20,50,100,150].find(v=>v>=mx)||150;setGauge(nice);$('voltNote').textContent=`Skala 0–${nice}V · ambang LED ${LED_V}V · V puncak rata-rata ≈ ${model().vs.toFixed(1)}V (setelah rectifier)`;$('cNum').textContent='≈ '+((ser?NP:1)*avgVp()).toFixed(1)+' V'}
+function model(){const c=CFG[circuit],ceq=c.ser?cp()/NP:cp()*NP,a=ceq/(ceq+CS);return{ceq,a,g:1-Math.pow(1-a,NC),vs:Math.max(0,(c.ser?NP:1)*avgVp()-VD)}}
+function updCalc(){const m=model(),n=m.vs>LED_V+.05?'≈ '+Math.ceil(Math.log(1-(LED_V+.05)/m.vs)/Math.log(1-m.g))+'×':'tak nyala (V < '+(LED_V+.05).toFixed(2)+'V)',ser=CFG[circuit].ser;
+$('calc').innerHTML=`<div class="eyebrow" style="margin:0 0 6px">Perhitungan</div><div class="cr"><span>V keping (rata-rata data)</span><b>${avgVp().toFixed(2)} V</b></div><div class="cr"><span>V puncak rangkaian − rectifier</span><b>${m.vs.toFixed(2)} V</b></div><div class="cr"><span>V injakan terakhir (keping)</span><b>${lastVp.toFixed(1)} V</b></div><div class="cr"><span>C ekivalen piezo</span><b>${(m.ceq*1e9).toFixed(1)} nF</b></div><div class="cr"><span>Terisi per injakan (g)</span><b>${(m.g*100).toFixed(1)}%</b></div><div class="cr"><span>Muatan kapasitor Q</span><b>${(CS*capV*1e6).toFixed(2)} µC</b></div><div class="cr"><span>Energi kapasitor E</span><b>${(.5*CS*capV*capV*1e6).toFixed(2)} µJ</b></div><div class="cr"><span>Arus pengisian rata-rata</span><b>${(CS*m.vs*m.g*2*1e6).toFixed(2)} µA</b></div><div class="cr"><span>Biaya-per-volt (Rp131.250 ÷ V puncak)</span><b>${m.vs>0?'± Rp'+Math.round(131250/m.vs).toLocaleString('id-ID')+'/V':'–'}</b></div><div class="cr"><span>Injakan sampai LED nyala</span><b>${n}</b></div><div class="eyebrow" style="margin:12px 0 6px">Daya dan energi per injakan</div><div class="cr"><span>Diameter / C keping</span><b>${dia} mm / ${(cp()*1e9).toFixed(0)} nF</b></div><div class="cr"><span>E teoritis per keping</span><b>${(.5*cp()*avgVp()**2*1e6).toFixed(2)} µJ</b></div><div class="cr"><span>E total 8 keping</span><b>${(NP*.5*cp()*avgVp()**2*1e6).toFixed(2)} µJ</b></div><div class="cr"><span>Daya rata-rata (2 langkah/dtk)</span><b>${(NP*.5*cp()*avgVp()**2*2*1e6).toFixed(2)} µW</b></div><div class="cr"><span>Lampu: ${LAMP[lampT].t}</span><b>${(LED_V*LAMP[lampT].i*1e3).toFixed(2)} mW</b></div><div class="cr"><span>Lama nyala nyata (E kapasitor ÷ P)</span><b>${capV>LED_V?(.5*CS*(capV*capV-LED_V*LED_V)/(LED_V*LAMP[lampT].i)*1e3).toFixed(1)+' ms':'–'}</b></div><small>Acuan jurnal per keping: 3,8–14,5 µW (44 mm, 1 injakan); maks 86 µW (27 mm) dan 220 µW (35 mm) pada beban optimal. Nilai di atas = ½CV² teoritis tanpa rugi, jadi lebih rendah dari uji dinamis. C ∝ diameter²; V keping ∝ diameter^0,85 (asumsi, mengacu rasio 27→35 mm di jurnal sepatu piezo).</small>
+<small>${ser?'Seri: C = Cp/N':'Paralel: C = N·Cp'} (Cp=${(cp()*1e9).toFixed(0)} nF, N=8) · g = 1−(1−C/(C+Cs))^5, Cs=1 µF<br>V ← Vsat − (Vsat − V)(1−g) · Q = Cs·V · E = ½·Cs·V²<br>V puncak: Seri = N·Vp (ΣV), Paralel = Vp. Vp dari data jurnal (V = d·F/C), rectifier Schottky 2×0,3 V; seri riil naik tak sepenuhnya linear.<br>LED + resistor (acuan 5 V, R = (5−Vf)/I) menguras V eksponensial ke Vf; τ ∝ R·C (τ 5 dtk untuk LED merah, waktu simulasi diperlambat). Generator: V = 12V·ω, tiap injakan ω naik, lalu meluruh (τ 10 dtk).</small>`}
+function applyStep(ti,vp){const m=model();lastVp=vp>0?vp:pickVp();const vs=Math.max(0,(CFG[circuit].ser?NP:1)*lastVp-VD);if(vs>capV)capV=vs-(vs-capV)*(1-m.g);omega+=(1-omega)*.2;flash=ti>=0?ti:Math.floor(Math.random()*tiles.length);statusLeds.forEach(l=>l.material=ledOff);statusLeds[flash].material=ledOn;flashT=0}
+function setLamp(on){lampOn=on;lampBtn.textContent=on?'⏻ Matikan Lampu':'💡 Nyalakan Lampu';lampBtn.classList.toggle('on',on)}
+stepBtn.onclick=step;
+lampBtn.onclick=()=>{if(capV>=LED_V+.05)setLamp(!lampOn)};
+addEventListener('keydown',e=>{if(e.code==='Space'&&$('menu').classList.contains('hide')&&$('cmp').classList.contains('hide')){e.preventDefault();step()}});
+
+/* ---------- UI: menu, mode ---------- */
+function setCircuit(c){
+  circuit=c;const d=CFG[c];capV=0;omega=0;setLamp(false);buildWiring(c);updCalc();
+  $('eyebrow').textContent=d.eb;$('ttl').textContent=d.t;$('sub').textContent=d.sub;updScale();
+  $('cLbl').textContent=d.lbl;$('hint').textContent=d.hint;
+  $('legend').innerHTML=d.leg.map(r=>`<div class="legend-row"><div class="swatch" style="background:${r[0]}"></div><div><span class="ln">${r[1]}</span><span class="ld">${r[2]}</span></div></div>`).join('');
+  document.querySelectorAll('[data-c]').forEach(b=>b.classList.toggle('on',b.dataset.c===c));
+  try{localStorage.setItem('pz_c',c)}catch(e){}
+}
+function setUI(u){
+  ui=u;document.body.dataset.ui=u;$('panel').classList.remove('min');
+  camDist=u==='hp'?19:15;
+  document.querySelectorAll('[data-u]').forEach(b=>b.classList.toggle('on',b.dataset.u===u));
+  try{localStorage.setItem('pz_u',u)}catch(e){}resize();
+}
+document.querySelectorAll('[data-c]').forEach(b=>b.addEventListener('click',()=>setCircuit(b.dataset.c)));
+document.querySelectorAll('[data-u]').forEach(b=>b.addEventListener('click',()=>setUI(b.dataset.u)));
+$('grab').onclick=()=>$('panel').classList.toggle('min');
+let st=0;
+function checkNext(){$('go').disabled=st===0&&$('nm').value.trim().length<2}
+function showStep(i){st=i;document.querySelectorAll('.stp').forEach(e=>e.classList.toggle('on',+e.dataset.s===i));$('back').style.visibility=i?'visible':'hidden';$('go').textContent=i===2?'Mulai Simulasi →':'Lanjut →';document.querySelectorAll('.dots i').forEach((d,k)=>d.classList.toggle('on',k===i));checkNext()}
+function hello(){const h=$('hello');h.textContent='Halo, ';const b=document.createElement('b');b.textContent=userName;h.append(b,' 👋')}
+$('go').onclick=()=>{if(st<2)return showStep(st+1);userName=$('nm').value.trim();try{localStorage.setItem('pz_n',userName)}catch(e){}hello();$('menu').classList.add('hide')};
+$('back').onclick=()=>showStep(st-1);
+$('nm').oninput=checkNext;$('nm').onkeydown=e=>{if(e.key==='Enter'&&!$('go').disabled)$('go').click()};
+$('step10').onclick=()=>{for(let i=0;i<10;i++)step()};
+$('menuBtn').onclick=()=>{$('nm').value=userName;showStep(0);$('menu').classList.remove('hide')};
+$('scn').value=scn;$('scn').onchange=e=>{scn=e.target.value;capV=0;setLamp(false);updScale();updCalc()};
+$('dia').onchange=e=>{dia=+e.target.value;discs.forEach(m=>m.scale.set(dia/27,1,dia/27));capV=0;setLamp(false);updScale();updCalc()};
+$('lmp').onchange=e=>setLampType(e.target.value);
+
+/* ---------- Pop up perbandingan perlakuan ---------- */
+const NAMA={circuit:{seri:'Seri',paralel:'Paralel'},scn:{all:'Semua jenis berat badan',w69:'Berjalan · 69 kg',w98:'Berjalan · 98 kg',j69:'Melompat · 69 kg',j98:'Melompat · 98 kg'},dia:{20:'20 mm',27:'27 mm',35:'35 mm',44:'44 mm'},lmp:{ultra:'LED hemat',red:'LED merah',white:'LED putih'}};
+const FACT={
+ scn:{desc:'Cara dan beban injakan menentukan tekanan pada keping, sehingga tegangan tiap keping (V = d·F/C) berbeda jauh. Data: 10 sampel jurnal REM 2025. Melompat dan beban lebih berat menghasilkan tegangan lebih tinggi.',opts:['w69','w98','j69','j98'],cur:()=>scn,use:k=>{$('scn').value=k;$('scn').onchange({target:{value:k}})}},
+ dia:{desc:'Keping lebih lebar punya kapasitansi lebih besar (C ∝ d²) dan tegangan lebih tinggi (V ∝ d^0,85, asumsi model), sehingga energi per injakan naik cepat.',opts:['20','27','35','44'],cur:()=>String(dia),use:k=>{$('dia').value=k;$('dia').onchange({target:{value:k}})}},
+ lmp:{desc:'Jenis LED tidak mengubah energi yang dihasilkan piezo. Yang berbeda adalah ambang nyala (Vf) dan arus: LED berdaya lebih kecil menguras kapasitor lebih pelan, sehingga nyala lebih lama.',opts:['ultra','red','white'],cur:()=>lampT,use:k=>{$('lmp').value=k;setLampType(k)}},
+ circuit:{desc:'Seri menjumlahkan tegangan (ΣV) tetapi kapasitansi ekivalen mengecil. Paralel menjaga tegangan satu keping, tetapi kapasitansi besar membuat muatan per injakan lebih banyak.',opts:['seri','paralel'],cur:()=>circuit,use:k=>setCircuit(k)}
+};
+function calcP(p){
+  const d=+p.dia,ser=p.circuit==='seri',cpx=CP*(d/27)**2,f=(d/27)**.85,vp=f*SCN[p.scn].d.reduce((a,b)=>a+b)/SCN[p.scn].d.length;
+  const ceq=ser?cpx/NP:cpx*NP,a=ceq/(ceq+CS),g=1-Math.pow(1-a,NC),vs=Math.max(0,(ser?NP:1)*vp-VD),L=LAMP[p.lmp],vth=L.vf+.05;
+  const n=vs>vth?Math.ceil(Math.log(1-vth/vs)/Math.log(1-g)):null,E=NP*.5*cpx*vp*vp;
+  return{vp,vs,I:CS*vs*g*2*1e6,b:vs>0?131250/vs:null,ceq:ceq*1e9,g:g*100,n,E:E*1e6,P:E*2*1e6,pl:L.vf*L.i*1e3,lama:vs>L.vf?.5*CS*(vs*vs-L.vf*L.vf)/(L.vf*L.i)*1e3:null};
+}
+const ROWS=[
+ ['V keping rata-rata','vp',v=>v.toFixed(2)+' V','hi'],
+ ['V puncak (setelah rectifier)','vs',v=>v.toFixed(2)+' V','hi',1],
+ ['C ekivalen piezo','ceq',v=>v.toFixed(1)+' nF'],
+ ['Terisi per injakan','g',v=>v.toFixed(1)+'%','hi'],
+ ['Arus pengisian rata-rata','I',v=>v.toFixed(2)+' µA','hi'],
+ ['Injakan sampai LED nyala','n',v=>v==null?'tak nyala':'≈ '+v+'×','lo'],
+ ['Biaya-per-volt','b',v=>v==null?'–':'Rp'+Math.round(v).toLocaleString('id-ID')+'/V','lo'],
+ ['E total 8 keping','E',v=>v.toFixed(2)+' µJ','hi',1],
+ ['Daya rata-rata (2 langkah/dtk)','P',v=>v.toFixed(2)+' µW','hi'],
+ ['Daya lampu','pl',v=>v.toFixed(2)+' mW','lo'],
+ ['Lama nyala (kapasitor penuh)','lama',v=>v==null?'–':v>=1000?(v/1000).toFixed(1)+' dtk':v.toFixed(1)+' ms','hi',1]
+];
+const same=a=>a.every(v=>v===a[0]||(v!=null&&a[0]!=null&&Math.abs(v-a[0])<1e-9));
+let cf='scn',csel=new Set();
+function cmpTab(f){cf=f;csel=new Set(FACT[f].opts);document.querySelectorAll('#cmpTabs button').forEach(b=>b.classList.toggle('on',b.dataset.f===f));$('cmpDesc').textContent=FACT[f].desc;cmpRender()}
+function cmpRender(){
+  const F=FACT[cf],cur=F.cur(),base={circuit,scn,dia:String(dia),lmp:lampT};
+  $('cmpChips').innerHTML=F.opts.map(k=>`<button class="chip${csel.has(k)?' on':''}" data-k="${k}">${csel.has(k)?'✓ ':''}${NAMA[cf][k]}</button>`).join('');
+  const ks=F.opts.filter(k=>csel.has(k)),res=ks.map(k=>calcP({...base,[cf]:k})),multi=ks.length>1;
+  let h='<table><thead><tr><th>Metrik</th>'+ks.map(k=>`<th>${NAMA[cf][k]}<br>${k===cur?'<span class="act">✔ Dipakai</span>':`<button class="use" data-use="${k}">Pakai</button>`}</th>`).join('')+'</tr></thead><tbody>';
+  ROWS.forEach((rw,ri)=>{
+    const [lb,key,fmt,dir,bar]=rw,vals=res.map(r=>r[key]),ok=vals.filter(v=>v!=null),mx=Math.max(0,...ok),sm=multi&&same(vals);
+    let bv=null;if(multi&&dir&&!sm&&ok.length)bv=dir==='hi'?Math.max(...ok):Math.min(...ok);
+    h+=`<tr class="${sm?'same':''}" style="--i:${ri}"><td>${lb}</td>`+vals.map(v=>{
+      let c='';if(bv!==null&&v!=null&&Math.abs(v-bv)<1e-9)c='best';else if(key==='n'&&v==null&&multi&&!sm)c='bad';
+      return `<td class="${c}">${fmt(v)}${bar&&v!=null&&mx>0?`<span class="cbar"><i style="width:${Math.max(3,v/mx*100)}%"></i></span>`:''}</td>`}).join('')+'</tr>';
+  });
+  $('cmpTbl').innerHTML=h+'</tbody></table>';
+  const S=[],nm=i=>`<b>${NAMA[cf][ks[i]]}</b>`;
+  if(multi){
+    const vs=res.map(r=>r.vs),mx=vs.indexOf(Math.max(...vs)),mn=vs.indexOf(Math.min(...vs));
+    if(vs[mx]-vs[mn]>1e-6)S.push(`V puncak tertinggi: ${nm(mx)} (${vs[mx].toFixed(1)} V), terendah: ${nm(mn)} (${vs[mn].toFixed(1)} V)${vs[mn]>0?`, selisih ≈ ${(vs[mx]/vs[mn]).toFixed(1)}×`:''}.`);
+    const ns=res.map(r=>r.n);
+    if(!same(ns)){
+      const okI=ns.map((v,i)=>v==null?-1:i).filter(i=>i>=0),noI=ns.map((v,i)=>v==null?i:-1).filter(i=>i>=0);
+      if(okI.length){const b=okI.reduce((a,c)=>ns[c]<ns[a]?c:a);S.push(`LED paling cepat menyala: ${nm(b)} (≈ ${ns[b]}× injak).`)}
+      if(noI.length)S.push(`Tidak menyalakan LED: ${noI.map(nm).join(', ')} (V puncak di bawah ambang).`)}
+    const lm=res.map(r=>r.lama||0);
+    if(!same(lm)&&Math.max(...lm)>0){const b=lm.indexOf(Math.max(...lm));S.push(`Nyala paling lama: ${nm(b)}.`)}
+    if(!S.length)S.push('Pada faktor ini, hasil keempat metrik utama sama.');
+  }else S.push('Pilih minimal dua perlakuan untuk melihat perbandingan.');
+  $('cmpSum').innerHTML='<div class="eyebrow" style="margin-bottom:4px">Kesimpulan</div><ul>'+S.map(s=>`<li>${s}</li>`).join('')+'</ul>';
+  $('cmpBase').textContent='Faktor lain mengikuti simulasi saat ini: '+['circuit','scn','dia','lmp'].filter(f=>f!==cf).map(f=>NAMA[f][base[f]]).join(' · ')+'. Hijau = nilai terbaik pada baris itu; baris pudar = tidak berbeda antar pilihan.';
+}
+function cmpClose(){$('cmp').classList.add('hide')}
+function cmpOpen(f){nudgeHide();cmpTab(f||cf);$('cmp').classList.remove('hide')}
+$('cmpBtn').onclick=()=>cmpOpen();
+$('cmpX').onclick=cmpClose;
+$('cmp').addEventListener('click',e=>{
+  if(e.target.id==='cmp')return cmpClose();
+  const t=e.target.closest('[data-f]'),c=e.target.closest('.chip'),u=e.target.closest('[data-use]');
+  if(t)cmpTab(t.dataset.f);
+  else if(c){const k=c.dataset.k;if(csel.has(k)){if(csel.size>1)csel.delete(k)}else csel.add(k);cmpRender()}
+  else if(u){FACT[cf].use(u.dataset.use);cmpRender()}
+});
+addEventListener('keydown',e=>{if(e.key==='Escape')cmpClose()});
+
+/* ---------- Ajakan animasi: "Ingin tahu perbedaannya?" ---------- */
+const NUDGE={
+ start:['Ingin tahu mengenai perbedaannya?','Bandingkan gaya injak, diameter, lampu, dan rangkaian.'],
+ scn:['Ingin tahu perbedaan tiap gaya injak?','Lihat beda berjalan vs melompat dan 69 vs 98 kg.'],
+ dia:['Ingin tahu perbedaan tiap diameter?','Lihat bedanya keping 20, 27, 35, dan 44 mm.'],
+ lmp:['Ingin tahu perbedaan tiap lampu?','Lihat beda LED hemat, merah, dan putih.'],
+ circuit:['Ingin tahu perbedaan seri dan paralel?','Lihat tegangan, arus, dan biaya-per-volt.']
+};
+let nT=0,nLast=0,nF='scn',nStarted=false,chT=0;
+function nudgeHide(){$('nudge').classList.remove('show');$('cmpBtn').classList.remove('pulse');clearTimeout(nT)}
+function nudge(f,force){
+  if(!$('menu').classList.contains('hide')||!$('cmp').classList.contains('hide'))return;
+  const now=Date.now();if(!force&&now-nLast<15000)return;nLast=now;
+  nF=f==='start'?cf:f;$('nB').textContent=NUDGE[f][0];$('nS').textContent=NUDGE[f][1];
+  const n=$('nudge');n.classList.remove('show');void n.offsetWidth;n.classList.add('show');$('cmpBtn').classList.add('pulse');
+  clearTimeout(nT);nT=setTimeout(nudgeHide,9000);
+}
+function nudgeSoon(f){clearTimeout(chT);chT=setTimeout(()=>nudge(f),900)}
+function startNudge(ms){setTimeout(()=>{if(!nStarted&&$('menu').classList.contains('hide')){nStarted=true;nudge('start',true)}},ms)}
+$('nYes').onclick=()=>cmpOpen(nF);
+$('nNo').onclick=nudgeHide;
+[['scn','scn'],['dia','dia'],['lmp','lmp']].forEach(([id,f])=>$(id).addEventListener('change',()=>nudgeSoon(f)));
+document.querySelectorAll('[data-c]').forEach(b=>b.addEventListener('click',()=>nudgeSoon('circuit')));
+$('go').addEventListener('click',()=>startNudge(1500));
+
+/* ---------- kamera & input ---------- */
+let drag=false,px=0,py=0,rotY=.42,rotX=-.24,camDist=15,pinch=0;
+holder.addEventListener('mousedown',e=>{drag=true;px=e.clientX;py=e.clientY});
+addEventListener('mouseup',()=>drag=false);
+addEventListener('mousemove',e=>{if(!drag)return;rotY+=(e.clientX-px)*.006;rotX=Math.max(-1,Math.min(.35,rotX+(e.clientY-py)*.006));px=e.clientX;py=e.clientY});
+holder.addEventListener('wheel',e=>{camDist=Math.max(6,Math.min(26,camDist+e.deltaY*.013))},{passive:true});
+holder.addEventListener('touchstart',e=>{if(e.touches.length===2)pinch=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);else{px=e.touches[0].clientX;py=e.touches[0].clientY;pinch=0}},{passive:true});
+holder.addEventListener('touchmove',e=>{
+  if(e.touches.length===2){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);if(pinch)camDist=Math.max(6,Math.min(26,camDist-(d-pinch)*.04));pinch=d;return}
+  if(pinch)return;rotY+=(e.touches[0].clientX-px)*.006;rotX=Math.max(-1,Math.min(.35,rotX+(e.touches[0].clientY-py)*.006));px=e.touches[0].clientX;py=e.touches[0].clientY},{passive:true});
+function resize(){
+  const w=innerWidth,h=innerHeight;camera.aspect=w/h;
+  camera.fov=w/h<.8?58:38; // layar potret butuh sudut lebih lebar
+  if(ui==='hp')camera.setViewOffset(w,h,0,h*.17,w,h);else camera.clearViewOffset();
+  camera.updateProjectionMatrix();renderer.setSize(w,h);
+}
+addEventListener('resize',resize);
+
+
+/* ===== ORANG BERJALAN: 1 injakan = 1 orang, bentuk badan berbeda ===== */
+const FLOORY=-1.2,AMP=.46,pressT=[0,0];let people=[],pops=[],nPer=0,pplN=0;
+const BUILDS={
+69:[{h:1,w:1,bl:0,sk:0xd9a273,sh:0x2f78c4,pt:0x2c3340,hr:0x2a1d14},
+{h:1.13,w:.8,bl:0,sk:0xb97a4f,sh:0xc4492f,pt:0x333333,hr:0x111111},
+{h:.9,w:1.1,bl:.25,sk:0xf0c29a,sh:0xd1527f,pt:0x35405a,hr:0x4a2b18,lg:1},
+{h:1.05,w:.92,bl:0,sk:0x8d5a3a,sh:0x20a3a3,pt:0x2e2e2e,hr:0x111111,lg:1},
+{h:.95,w:1.2,bl:.4,sk:0xe2ab7d,sh:0xe0a21f,pt:0x6a4a3a,hr:0xaaaaaa}],
+98:[{h:.88,w:1.55,bl:1,sk:0xe8b48a,sh:0x3f9a5a,pt:0x4a3b2a,hr:0x6b4a2a},
+{h:1.14,w:1.35,bl:.7,sk:0x8d5a3a,sh:0x6a4fb3,pt:0x222222,hr:0x111111},
+{h:1,w:1.7,bl:1,sk:0xd49a6b,sh:0xb5651d,pt:0x33415c,hr:0x3a2a1a},
+{h:.82,w:1.45,bl:.8,sk:0xf0c29a,sh:0x444444,pt:0x1a3a2a,hr:0xbbbbbb,lg:1},
+{h:1.2,w:1.25,bl:.5,sk:0xa8734a,sh:0xc4492f,pt:0x2c3340,hr:0x111111}]};
+const mats={},mt=c=>mats[c]||(mats[c]=new THREE.MeshStandardMaterial({color:c,roughness:.75}));
+function part(geo,c,x,y,z,par){const m=new THREE.Mesh(geo,mt(c));m.position.set(x,y,z);m.castShadow=true;par.add(m);return m}
+function makePerson(b,kg){
+  const H=6*b.h*(.96+Math.random()*.08),w=b.w,L=H*.46,th=H*.34,fh=H*.04,lr=H*.062*Math.pow(w,.7),g=new THREE.Group();
+  part(new THREE.CylinderGeometry(H*.115*w,H*.1*w,th,18),b.sh,0,th/2,0,g).scale.z=.78;
+  if(b.bl)part(new THREE.SphereGeometry(H*.1*w,16,12),b.sh,H*.03+H*.045*b.bl,th*.18,0,g).scale.set(1.1,1,.9);
+  part(new THREE.CylinderGeometry(H*.03,H*.035,H*.05,10),b.sk,0,th+H*.02,0,g);
+  const hr=H*.085,hy=th+H*.05+hr*.95;
+  part(new THREE.SphereGeometry(hr,18,14),b.sk,0,hy,0,g);
+  part(new THREE.SphereGeometry(hr*1.06,18,10,0,Math.PI*2,0,Math.PI*.52),b.hr,-hr*.12,hy+hr*.05,0,g);
+  part(new THREE.BoxGeometry(hr*.3,hr*.3,hr*.25),b.sk,hr*.95,hy-hr*.05,0,g);
+  if(b.lg)part(new THREE.BoxGeometry(hr*.5,hr*1.9,hr*1.6),b.hr,-hr*.75,hy-hr*.7,0,g);
+  const limb=(z,len,r,c,y0)=>{const p=new THREE.Group();p.position.set(0,y0,z);part(new THREE.CylinderGeometry(r,r*.85,len,10),c,0,-len/2,0,p);g.add(p);return p};
+  const lz=H*.065*Math.sqrt(w),legs=[limb(lz,L,lr,b.pt,0),limb(-lz,L,lr,b.pt,0)];
+  legs.forEach(p=>{const f=new THREE.Group();f.position.y=-L;part(new THREE.BoxGeometry(H*.2,fh,H*.09),0x222222,H*.06,-fh/2,0,f);p.add(f);p.foot=f});
+  const az=H*.125*w+H*.03,ar=lr*.7,arms=[limb(az,H*.34,ar,b.sh,th*.9),limb(-az,H*.34,ar,b.sh,th*.9)];
+  arms.forEach(p=>part(new THREE.SphereGeometry(ar*1.1,8,8),b.sk,0,-H*.34,0,p));
+  const tag=label2(kg+' kg','#f4d9a8',56,3,.75);tag.position.set(0,th+H*.3,0);g.add(tag);
+  return{g,legs,arms,H,L,fh}
+}
+/* peron: lantai setinggi permukaan modul agar kaki mendarat di atas tatakan */
+const platMat=M({color:0x8d8f90,roughness:.9}),yelMat=M({color:0xe0b500,roughness:.6});
+const plats=[-1,1].map(sg=>{const b=new THREE.Mesh(new THREE.BoxGeometry(27,1,4.4),platMat);b.position.x=sg*16.5;b.receiveShadow=true;scene.add(b);
+  const s=new THREE.Mesh(new THREE.BoxGeometry(27,.02,.35),yelMat);s.position.set(sg*16.5,0,1.85);scene.add(s);return{b,s}});
+const SC4=['w69','w98','j69','j98'],allCtr={w69:0,w98:0,j69:0,j98:0};
+const _oc=$('scn').onchange;$('scn').onchange=e=>{for(const k in allCtr)allCtr[k]=0;seqI=0;_oc(e)};
+/* gerbang akses: tap kartu lalu palang terbuka, orang melangkah ke modul piezo */
+const GX=-6,STOPX=-7.9,gate=new THREE.Group();scene.add(gate);
+const gm=(w,h,l,c,x,y,z,basic,tr)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,l),basic?new THREE.MeshBasicMaterial({color:c,transparent:!!tr,opacity:tr||1}):mt(c));m.position.set(x,y,z);m.castShadow=true;gate.add(m);return m};
+[1,-1].forEach(sg=>{gm(1,3.4,.5,0x3a4048,GX,1.7,sg*1.9);gm(1.02,.12,.52,0xe0b500,GX,3.4,sg*1.9)});
+const flaps=[1,-1].map(sg=>gm(1,1.2,1.65,0x5bd0ff,GX,2.1,sg*.825,true,.55));
+gm(.6,.1,.55,0x1c2229,GX,3.5,1.9).rotation.x=-.35;
+const led=gm(.22,.06,.22,0xff3b30,GX,3.58,1.9,true);led.rotation.x=-.35;let gOpen=0;
+function beep(){try{const ac=beep.ac;if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=1500;g.gain.value=.04;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+.09)}catch(e){}}
+function spawn(){
+  const all=scn==='all',sc=all?SC4[nPer%4]:scn,cls=/98/.test(sc)?98:69,jump=sc[0]==='j',
+    minX=people.reduce((m,p)=>Math.min(m,p.st==='come'?p.tx:p.x),-9),xf=Math.min(-14,minX-4.6),xj=Math.max(-36,xf),zl=((nPer%3)-1)*.3;
+  let P=null,bd=1e9;
+  crowd.forEach(c=>{if(c.cls===cls&&c.x<-10){const d=Math.hypot(c.x-xj,c.z-zl);if(d<bd){bd=d;P=c}}});
+  const join=!!P;
+  if(join){crowd.splice(crowd.indexOf(P),1);const tg=label2(cls+' kg','#f4d9a8',56,3,.75);tg.position.set(0,P.H*.64,0);P.g.add(tg);addAmb(true)}
+  else{const b0=BUILDS[cls][nPer%5];P=makePerson(b0,cls);P.b=b0;P.x=xf;P.z=zl;P.dist=0;scene.add(P.g)}
+  const b=P.b;
+  Object.assign(P,{sc,di:all?allCtr[sc]++%10:null,v:(jump?4.8:4.2)+(nPer%3)*.25,hit:0,jump,ph:P.ph||0,stride:2*P.L*Math.sin(AMP),st:join?'come':'walk',tt:0,sw:join?P.sw:1,tx:xj,tz:zl,ry:0,w8:0,wp:join?[[XS,(P.z<0?-1:1)*4.9],[XS,(P.z<0?-1:1)*2],[xj,zl]]:null,
+    rx:-Math.max(0,Math.min(.6,(1.9-(P.H*.125*b.w+P.H*.03)-zl)/1.7))});
+  if(!join)P.g.position.z=zl;
+  try{beep.ac=beep.ac||new (window.AudioContext||window.webkitAudioContext)();beep.ac.resume()}catch(e){}
+  people.push(P);nPer++
+}
+function step(){spawn()}
+function pose(p,top){
+  const s=Math.sin(p.ph)*p.sw,a=s*AMP,lift=1-Math.abs(s),sw=p.jump?1.5:.9;
+  p.legs[0].rotation.z=a;p.legs[1].rotation.z=-a;p.legs[0].foot.rotation.z=-a;p.legs[1].foot.rotation.z=a;
+  p.arms[0].rotation.set(0,0,-a*sw);p.arms[1].rotation.set(0,0,a*sw);
+  if(p.st==='tap'){const u=Math.min(1,p.tt/.9),e=Math.min(1,Math.sin(Math.PI*u)*1.8);p.arms[0].rotation.set(p.rx*e,0,e+.07*e*Math.sin(p.tt*24))}
+  p.g.position.x=p.x;p.g.position.y=top+p.fh+p.L*Math.cos(AMP)+lift*p.L*(1-Math.cos(AMP))+(p.jump?lift*p.H*.1*p.sw:0)
+}
+function pop(p,v){
+  const s=label2('+'+v.toFixed(1)+' V','#4ade80',72,3.4,.85);s.position.set(p.x,p.g.position.y+p.H*1.25,.3);scene.add(s);pops.push({s,t:0});
+  pplN++;$('pplRead').textContent=pplN
+}
+function updPeople(dt){
+  const top=tiles[0].lT.position.y+.075;
+  plats.forEach(q=>{q.b.scale.y=top-FLOORY;q.b.position.y=(top+FLOORY)/2;q.s.position.y=top+.012});gate.position.y=top;
+  people.forEach(p=>{if(p.st!=='come')return;
+    const w=p.wp[0],dx=w[0]-p.x,dz=w[1]-p.z,d=Math.hypot(dx,dz),s=Math.min(d,p.v*dt);
+    if(d>1e-3){p.x+=dx/d*s;p.z+=dz/d*s;p.dist+=s;p.ry=-Math.atan2(dz,dx)}
+    if(d-s<.02){p.x=w[0];p.z=w[1];if(p.wp.length>1)p.wp.shift();else{p.st='walk';p.ry=0}}
+    p.sw+=(1-p.sw)*Math.min(1,dt*8);p.ph=p.dist/p.stride*Math.PI;p.g.position.z=p.z;
+    pose(p,hAt(p.x,p.z,top));
+    p.g.rotation.y+=(p.ry-p.g.rotation.y)*Math.min(1,dt*8)});
+  const ps=people.filter(p=>p.st!=='come').sort((a,b)=>b.x-a.x);
+  ps.forEach(p=>{if(p.g.rotation.y)p.g.rotation.y*=Math.max(0,1-dt*8)});
+  ps.forEach((p,i)=>{
+    const o=p.ph,ox=p.x,ahead=ps[i-1];
+    if(p.st==='tap'){p.tt+=dt;if(!p.beeped&&p.tt>.45){p.beeped=1;beep()}if(p.tt>.9)p.st='pass'}
+    else{let nx=p.x+p.v*dt;if(p.st==='walk'&&nx>=STOPX){nx=STOPX;p.st='tap';p.tt=0}
+      if(ahead)nx=Math.min(nx,ahead.x-3.6);p.x=Math.max(p.x,nx);if(p.st==='pass'&&p.x>-4.2)p.st='done'}
+    p.sw+=((p.x-ox>1e-4?1:0)-p.sw)*Math.min(1,dt*8);
+    p.ph=p.x/p.stride*Math.PI;pose(p,top);
+    if(Math.floor((p.ph-Math.PI/2)/Math.PI)>Math.floor((o-Math.PI/2)/Math.PI)){
+      const fx=p.x+p.L*Math.sin(AMP);
+      if(fx>-3.15&&fx<3.15){pressT[fx<0?0:1]=1;if(!p.hit){p.hit=1;applyStep(fx<0?0:1,p.di!=null?vf()*SCN[p.sc].d[p.di]:0);pop({x:fx,g:p.g,H:p.H},lastVp)}}
+    }
+  });
+  const go=people.some(p=>p.st==='pass'||(p.st==='tap'&&p.tt>.45));
+  gOpen+=((go?1:0)-gOpen)*Math.min(1,dt*7);
+  flaps.forEach((f,k)=>{const sg=k?-1:1,sc=Math.max(.04,1-gOpen);f.scale.z=sc;f.position.z=sg*(1.65-.825*sc)});
+  led.material.color.set(go?0x2ee66b:0xff3b30);
+  people=people.filter(p=>{if(p.x>30){scene.remove(p.g);return false}return true});
+  tiles.forEach((t,i)=>{const d=pressT[i]*.2;t.lT.position.y=.85*3*EF-d;t.lP.position.y=.85*2*EF-d*.6;pressT[i]=Math.max(0,pressT[i]-dt*4)});
+  pops.forEach(q=>{q.t+=dt;q.s.position.y+=dt*2;q.s.material.opacity=Math.max(0,1-q.t/1.7)});
+  pops=pops.filter(q=>{if(q.t>1.7){scene.remove(q.s);q.s.material.map.dispose();q.s.material.dispose();return false}return true})
+}
+/* ===== LATAR STASIUN KERETA ===== */
+(()=>{
+  const SKY=0x7d8da0;renderer.setClearColor(SKY);scene.fog.color.set(SKY);scene.fog.near=45;scene.fog.far=120;
+  scene.children.forEach(o=>{if(o.isAmbientLight){o.color.set(0xe6edf5);o.intensity=.8}});
+  const ct=tex(256,256,x=>{x.fillStyle='#6f7377';x.fillRect(0,0,256,256);x.fillStyle='#7f858a';x.fillRect(0,0,128,128);x.fillRect(128,128,128,128);x.strokeStyle='#5e6266';x.lineWidth=4;x.strokeRect(0,0,256,256)});
+  ct.repeat.set(40,20);
+  floor.geometry.dispose();floor.geometry=new THREE.PlaneGeometry(80,40);floor.position.z=11;
+  floor.material.map=ct;floor.material.needsUpdate=true;
+  const bx=(w,h,l,c,x,y,z,basic)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,l),basic?new THREE.MeshBasicMaterial({color:c}):mt(c));m.position.set(x,y,z);m.receiveShadow=true;(bx.p||scene).add(m);return m};
+  /* tepi peron + garis kuning pemandu */
+  bx(80,2.4,.3,0x6e7173,0,-2.4,-9.15);bx(80,.05,.5,0xe0b500,0,-1.17,-8.4);
+  /* jalur rel */
+  bx(80,.2,12,0x4a4540,0,-3.5,-15);bx(80,.12,.14,0xb4b8bb,0,-3.34,-14.3);bx(80,.12,.14,0xb4b8bb,0,-3.34,-15.7);
+  const sl=new THREE.InstancedMesh(new THREE.BoxGeometry(.4,.12,3.2),mt(0x5a4a3a),70),M4=new THREE.Matrix4();
+  for(let i=0;i<70;i++){M4.makeTranslation(-41+i*1.2,-3.4,-15);sl.setMatrixAt(i,M4)}scene.add(sl);
+  /* rangkaian kereta: masuk, berhenti di peron, lalu berangkat lagi */
+  const trn=new THREE.Group();scene.add(trn);bx.p=trn;
+  [-14.3,14.3].forEach(cx=>{
+    bx(27,5,3.4,0xdadfe2,cx,-.2,-15);bx(27,.5,3.42,0xc0392b,cx,-1.5,-15);bx(27,.3,3.3,0x4b5560,cx,2.4,-15);
+    for(let k=-5;k<=5;k++)if(k)bx(1.6,1.4,.06,0xd8a31a,cx+k*2.4,.9,-13.27,true);
+    bx(1.5,3.4,.06,0x7f8a91,cx,.4,-13.27);bx(4,.7,2.6,0x2e3338,cx-8,-3,-15);bx(4,.7,2.6,0x2e3338,cx+8,-3,-15);
+  });bx.p=null;
+  let ph='in',tv=0,tw=0;trn.position.x=-95;
+  globalThis.updTrain=dt=>{const x=trn.position.x;
+    if(ph==='in'){tv=Math.max(.8,14*Math.sqrt(Math.min(1,-x/40)));const nx=Math.min(0,x+tv*dt);trn.position.x=nx;if(nx>=0){ph='stop';tw=0;tv=0}}
+    else if(ph==='stop'){tw+=dt;if(tw>8){ph='out';tv=.5}}
+    else{tv=Math.min(14,tv+4*dt);trn.position.x=x+tv*dt;if(x>95){ph='in';trn.position.x=-95}}};
+  /* atap peron, tiang, papan nama */
+  bx(90,.4,36,0x4b5560,0,11.6,-2);
+  [-36,-24,-12,12,24,36].forEach(x=>{const p=new THREE.Mesh(new THREE.CylinderGeometry(.4,.4,13,16),mt(0xc8c9ca));p.position.set(x,5.3,-8.6);p.castShadow=true;scene.add(p);
+    const r=new THREE.Mesh(new THREE.CylinderGeometry(.45,.45,1,16),mt(0xe0b500));r.position.set(x,-.7,-8.6);scene.add(r)});
+  bx(12,2.8,.25,0x1d3b6e,0,9,-8.6);
+  const sg=label2('STASIUN · PERON 1','#ffe27a',48,11,2.3);sg.position.set(0,9,-8.4);scene.add(sg);
+})();
+
+/* ===== KERUMUNAN DI STASIUN: orang berkeliaran, baru ke mesin tap saat tombol injak ditekan ===== */
+const crowd=[],ZN=[[-28,28,-7.4,-5.2],[-34,-8,5.2,7],[8,34,5.2,7]];
+function pickT(c){const z=ZN[c.zn];c.tx=z[0]+Math.random()*(z[1]-z[0]);c.tz=z[2]+Math.random()*(z[3]-z[2])}
+function addAmb(left){
+  const cls=Math.random()<.5?69:98,b=BUILDS[cls][Math.random()*5|0],P=makePerson(b,cls);
+  P.g.remove(P.g.children[P.g.children.length-1]);
+  const r=Math.random();P.zn=left?(r<.5?0:1):(r<.4?0:r<.7?1:2);const z=ZN[P.zn];
+  Object.assign(P,{b,cls,st:'amb',x:left?-37:z[0]+Math.random()*(z[1]-z[0]),z:z[2]+Math.random()*(z[3]-z[2]),v:1.1+Math.random()*1.1,stride:2*P.L*Math.sin(AMP),sw:0,dist:0,ph:0,w8:Math.random()*4,ry:0,jump:false});
+  pickT(P);P.g.position.z=P.z;scene.add(P.g);crowd.push(P)
+}
+for(let i=0;i<28;i++)addAmb(false);
+function updCrowd(dt){crowd.forEach(c=>{
+  let mv=0;
+  if(c.w8>0)c.w8-=dt;
+  else{const dx=c.tx-c.x,dz=c.tz-c.z,d=Math.hypot(dx,dz);
+    if(d<.3){pickT(c);if(Math.random()<.5)c.w8=2+Math.random()*5}
+    else{const s=Math.min(d,c.v*dt);c.x+=dx/d*s;c.z+=dz/d*s;c.dist+=s;c.ry=-Math.atan2(dz,dx);mv=1}}
+  c.sw+=(mv-c.sw)*Math.min(1,dt*6);c.ph=c.dist/c.stride*Math.PI;c.g.position.z=c.z;
+  c.g.rotation.y+=(c.ry-c.g.rotation.y)*Math.min(1,dt*6);pose(c,FLOORY)})}
+
+/* ===== TANGGA + DEKORASI STASIUN ===== */
+const XS=-20,SN=8,SD=.3,SW=4.4,stairs=[],BG=new THREE.BoxGeometry(1,1,1);
+const bk=(c,x,y,z,sx,sy,sz,basic)=>{const m=new THREE.Mesh(BG,basic?new THREE.MeshBasicMaterial({color:c}):mt(c));m.position.set(x,y,z);m.scale.set(sx,sy,sz);m.castShadow=!basic;m.receiveShadow=true;scene.add(m);return m};
+const hAt=(x,z,top)=>{const a=Math.abs(z);if(a<=2.2)return top;if(Math.abs(x-XS)<=SW/2&&a<2.2+SD*SN)return FLOORY+(top-FLOORY)*Math.min(1,Math.ceil((2.2+SD*SN-a)/SD)/SN);return FLOORY};
+function mkStairs(xc,sd){for(let k=0;k<SN;k++){const z=sd*(2.2+SD*(SN-k-.5)),px=SW/2+.08;
+  stairs.push({k,st:bk(k%2?0x9a9d9f:0x8a8d90,xc,0,z,SW,1,SD),no:bk(0xe0b500,xc,0,sd*(2.2+SD*(SN-k)),SW,.07,.07),p1:bk(0xe0b500,xc-px,0,z,.12,1.6,.12),p2:bk(0xe0b500,xc+px,0,z,.12,1.6,.12),r1:bk(0xcfa000,xc-px,0,z,.14,.14,SD),r2:bk(0xcfa000,xc+px,0,z,.14,.14,SD)})}
+  const s=label2('NAIK ▲ PERON 1','#ffe27a',44,5,1.1);s.position.set(xc,8,sd*3.4);scene.add(s)}
+[[XS,1],[XS,-1],[20,1],[20,-1]].forEach(a=>mkStairs(...a));
+function updStairs(){const top=tiles[0].lT.position.y+.075,df=top-FLOORY;stairs.forEach(s=>{const h=df*(s.k+1)/SN,y=FLOORY+h;s.st.scale.y=h;s.st.position.y=FLOORY+h/2;s.no.position.y=y;s.p1.position.y=s.p2.position.y=y+.8;s.r1.position.y=s.r2.position.y=y+1.6})}
+/* bangku, tanaman, kios, iklan, papan jadwal, lampu */
+[-28,-14,14,28].forEach(x=>{bk(0x7a5230,x,.3,8.2,5,.25,1.4);bk(0x6a4528,x,1.2,8.8,5,1.2,.15);[-2.2,2.2].forEach(d=>bk(0x333333,x+d,-.45,8.2,.2,1.5,1.2))});
+[-9,9,-33,33].forEach(x=>{const p=new THREE.Mesh(new THREE.CylinderGeometry(.8,.6,1.4,16),mt(0xb5651d));p.position.set(x,-.5,8.4);p.castShadow=true;scene.add(p);
+  [[0,1.3,0,1.3,0x2f8f46],[.7,2.1,.2,.9,0x3fae5a],[-.6,1.9,-.2,.8,0x287a3c]].forEach(([a,b,c,r,col])=>{const s=new THREE.Mesh(new THREE.SphereGeometry(r,14,10),mt(col));s.position.set(x+a,b,8.4+c);s.castShadow=true;scene.add(s)})});
+[[-31,'KOPI',0x2d6a4f,0xd1495b],[31,'ROTI',0x7a3b1d,0xe0a21f]].forEach(([x,t,c,a])=>{bk(c,x,.7,-7.8,5,3.8,2);bk(a,x,3,-6.9,5.4,.25,1.8);const s=label2(t,'#fff',48,3.5,1.1);s.position.set(x,1.9,-6.7);scene.add(s)});
+[[-36,'PROMO',0xc0392b],[-24,'KOPI',0x2e86c1],[-12,'TIKET',0x28a745],[12,'JAJAN',0xe08e0b],[24,'INFO',0x8e44ad],[36,'BUS',0x16a085]].forEach(([x,t,c])=>{bk(c,x,5,-8.1,3,4,.1,true);const s=label2(t,'#fff',44,2.8,.9);s.position.set(x,5,-8.0);scene.add(s)});
+[[-22,'KE BOGOR · 08:15','KE JAKARTA KOTA · 08:22'],[22,'KE BEKASI · 08:18','KE TANGERANG · 08:30']].forEach(([x,a,b])=>{bk(0x10151c,x,8.6,-8.4,7.4,2.4,.2);[[a,9.1],[b,8.2]].forEach(([t,y])=>{const s=label2(t,'#7dff9a',34,6.8,.8);s.position.set(x,y,-8.25);scene.add(s)})});
+for(let x=-30;x<=30;x+=10)[-4,4].forEach(z=>bk(0xfff1c9,x,11.3,z,4,.12,.8,true));
+
+function animate(){
+  requestAnimationFrame(animate);
+  const c=CFG[circuit];
+  const now=performance.now(),dt=Math.min(.1,(now-lastT)/1000);lastT=now;
+  updStairs();updPeople(dt);updCrowd(dt);updTrain(dt);capV*=Math.exp(-dt/TAU_LEAK);
+  if(lampOn){capV=LED_V+(capV-LED_V)*Math.exp(-dt/(TAU_LED*lampR()/1600));if(capV<LED_V+.05)setLamp(false)}
+  omega*=Math.exp(-dt/TAU_G);genV=GMAX*omega;fly.rotation.x+=omega*.5;genLamp.material.emissiveIntensity=omega*2;
+  const gs=genV.toFixed(1);if(gs!==lastG){lastG=gs;drawGen(genV)}
+  $('voltReading').textContent=capV.toFixed(2)+' V';$('genRead').textContent=genV.toFixed(2)+' V';$('totRead').textContent=(capV+genV).toFixed(2)+' V';if((fc=(fc+1)%8)===0)updCalc();$('voltFill').style.width=Math.min(100,capV/gMax*100)+'%';
+  const dis=capV<LED_V+.05&&!lampOn;lampBtn.disabled=dis;lampBtn.style.opacity=dis?.4:1;
+  const a=Math.PI*.83+(-Math.PI*1.66)*Math.min(1,capV/gMax);needle.rotation.z=a-Math.PI/2;
+  if(flash>=0&&++flashT>70){statusLeds[flash].material=ledOff;flash=-1}
+  const on=lampOn&&capV>=LED_V,br=on?.15+.85*Math.min(1,((capV-LED_V)/lampR())/LAMP[lampT].i):0;
+  core.material.emissive.setHex(LAMP[lampT].c);core.material.emissiveIntensity=br*1.8;bl.intensity=br*1.6;glow.material.opacity=br*.85;glow.scale.set(.8+.9*br,.8+.9*br,1);
+  camera.position.set(camDist*Math.sin(rotY)*Math.cos(rotX),camDist*Math.sin(-rotX)+4.5,camDist*Math.cos(rotY)*Math.cos(rotX)+1.5);
+  camera.lookAt(.5,1.8,1.5);renderer.render(scene,camera);
+}
+/* menu: tandai pilihan awal */
+setCircuit(circuit);setUI(ui);animate();
+$('nm').value=userName;showStep(0);
+if(userName){hello();$('menu').classList.add('hide');startNudge(2600)}
+</script>
+</body>
+</html>
